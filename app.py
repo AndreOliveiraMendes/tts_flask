@@ -2,11 +2,10 @@ import json
 import os
 import subprocess
 import threading
+from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
-from flask import session, redirect
-from functools import wraps
+from flask import Flask, jsonify, redirect, render_template, request, session
 
 load_dotenv()
 
