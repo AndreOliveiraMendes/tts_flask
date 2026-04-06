@@ -3,26 +3,80 @@ import os
 import subprocess
 import threading
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
+from flask import session, redirect
+from functools import wraps
+
+load_dotenv()
 
 app = Flask(__name__)
 lock = threading.Lock()
+
+# configs
+PORT = int(os.getenv("PORT", 5000))
+HOST = os.getenv("HOST", "127.0.0.1")
+DEBUG = bool(os.getenv("DEBUG") in ["True", "true", "1"])
+TUNNEL_SCRIPT = os.getenv("TUNNEL_SCRIPT")
+TUNNEL_KILL_SCRIPT = os.getenv("TUNNEL_KILL_SCRIPT")
+TUNNEL_DIR = os.getenv("TUNNEL_DIR", os.path.expanduser("~/misc_sh"))
+
+API_TOKEN = os.getenv("API_TOKEN")
+app.secret_key = os.getenv("SECRET_KEY", "dev_key")
+
+DEFAULT_VOLUME = float(os.getenv("DEFAULT_VOLUME", 0.9))
+DEFAULT_RATE = float(os.getenv("DEFAULT_RATE", 1))
+DEFAULT_PITCH = float(os.getenv("DEFAULT_PITCH", 1))
+
+def check_auth():
+    return session.get("auth") == True
+
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not check_auth():
+            return jsonify({"error": "unauthorized"}), 403
+        return f(*args, **kwargs)
+    return wrapper
+
+@app.context_processor
+def inject_auth():
+    return {
+        "auth": session.get("auth", False)
+    }
 
 @app.route('/')
 def index():
     return render_template("index.html")
 
+@app.route("/login")
+def login():
+    token = request.args.get("token")
+
+    if token == API_TOKEN:
+        session["auth"] = True
+        return redirect("/")  # volta pro painel
+
+    return "unauthorized", 403
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
 @app.route('/vibrate')
+@login_required
 def vibrate():
     os.system("termux-vibrate -d 500")
     return jsonify({"status": "ok"})
 
 @app.route('/fala')
+@login_required
 def fala():
     msg = request.args.get('msg', '')
-    volume = float(request.args.get('volume', 0.9))
-    rate = float(request.args.get('rate', 1))
-    pitch = float(request.args.get('pitch', 1))
+    volume = float(request.args.get('volume', DEFAULT_VOLUME))
+    rate = float(request.args.get('rate', DEFAULT_RATE))
+    pitch = float(request.args.get('pitch', DEFAULT_PITCH))
 
     if not msg:
         return jsonify({"status": "error", "msg": "Mensagem vazia"})
@@ -71,12 +125,13 @@ def status_data():
     })
 
 @app.route('/tunel/start')
+@login_required
 def start_tunel():
     porta = request.args.get("porta", "5000")
 
     subprocess.Popen([
         "/data/data/com.termux/files/usr/bin/bash",
-        os.path.expanduser("~/misc_sh/tunear.sh"),
+        TUNNEL_SCRIPT,
         porta,
         "cloud"
     ])
@@ -84,6 +139,7 @@ def start_tunel():
     return jsonify({"status": "ok", "porta": porta})
 
 @app.route('/tunel/stop')
+@login_required
 def stop_tunel():
     porta = request.args.get("porta")
 
@@ -91,25 +147,17 @@ def stop_tunel():
         return jsonify({"status": "error", "msg": "porta não informada"})
 
     subprocess.run([
-        os.path.expanduser("~/misc_sh/tunel_kill.sh"),
+        TUNNEL_KILL_SCRIPT,
         porta
     ])
 
     return jsonify({"status": "stopped", "porta": porta})
 
-@app.route('/tunel/status')
-def tunel_status():
-    try:
-        out = subprocess.check_output(["pgrep", "-f", "cloudflared"])
-        return jsonify({"running": True})
-    except:
-        return jsonify({"running": False})
-
 @app.route('/tunel/url')
 def tunel_url():
     porta = request.args.get("porta", "5000")
 
-    path = os.path.expanduser(f"~/misc_sh/current_tunnel_url_{porta}.txt")
+    path = os.path.join(TUNNEL_DIR, f"current_tunnel_url_{porta}.txt")
 
     if os.path.exists(path):
         with open(path) as f:
@@ -122,4 +170,4 @@ def tunel_url():
 def status():
     return render_template("status.html")
 
-app.run(host="0.0.0.0", port=5000)
+app.run(host=HOST, port=PORT, debug=DEBUG)
