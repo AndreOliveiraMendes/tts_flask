@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Controle Termux</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #1e1e2f, #2c2c54);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+/* glass effect */
+.container {
+    background: rgba(47,47,79,0.85);
+    backdrop-filter: blur(10px);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    width: 320px;
+    text-align: center;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+/* slider group */
+.range-group {
+    text-align: left;
+    margin-bottom: 15px;
+}
+
+.range-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 5px;
+    opacity: 0.9;
+}
+
+.range-value {
+    font-weight: bold;
+    color: #00e5ff;
+}
+
+input[type="range"] {
+    width: 100%;
+}
+
+/* buttons */
+button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: 0.2s;
+}
+
+.btn-fala {
+    background: #4CAF50;
+}
+
+.btn-fala:hover {
+    background: #45a049;
+}
+
+.btn-vibrate {
+    background: #2196F3;
+}
+
+.btn-vibrate:hover {
+    background: #1e88e5;
+}
+
+.footer {
+    margin-top: 15px;
+    font-size: 12px;
+    opacity: 0.7;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>📱 Termux Control</h1>
+    <div id="status" style="margin-top:10px; font-size:13px; opacity:0.8;"></div>
+
+    <form onsubmit="enviarFala(event)">
+        <input type="text" name="msg" placeholder="Digite algo pra falar...">
+
+        <div class="range-group">
+            <div class="range-header">
+                <span>🔊 Volume</span>
+                <span id="volVal" class="range-value">0.9</span>
+            </div>
+            <input type="range" name="volume" min="0" max="1" step="0.1" value="0.9" oninput="updateVal('volVal', this.value)">
+        </div>
+
+        <div class="range-group">
+            <div class="range-header">
+                <span>⚡ Velocidade</span>
+                <span id="rateVal" class="range-value">1</span>
+            </div>
+            <input type="range" name="rate" min="0.5" max="2" step="0.1" value="1" oninput="updateVal('rateVal', this.value)">
+        </div>
+
+        <div class="range-group">
+            <div class="range-header">
+                <span>🎵 Pitch</span>
+                <span id="pitchVal" class="range-value">1</span>
+            </div>
+            <input type="range" name="pitch" min="0.5" max="2" step="0.1" value="1" oninput="updateVal('pitchVal', this.value)">
+        </div>
+
+        <button class="btn-fala" type="submit">🔊 Falar</button>
+    </form>
+
+    <button class="btn-vibrate" onclick="vibrar()">📳 Vibrar</button>
+
+    <button onclick="window.location.href='/status'">📊 Status do Dispositivo</button>
+
+    <div class="footer">
+        Flask + Termux API
+    </div>
+</div>
+
+<script>
+function updateVal(id, value) {
+    document.getElementById(id).textContent = value;
+}
+
+async function enviarFala(e) {
+    e.preventDefault();
+
+    const msg = document.querySelector('[name="msg"]').value;
+    const volume = document.querySelector('[name="volume"]').value;
+    const rate = document.querySelector('[name="rate"]').value;
+    const pitch = document.querySelector('[name="pitch"]').value;
+
+    if (!msg) {
+        alert("Digite uma mensagem!");
+        return;
+    }
+
+    const res = await fetch(`/fala?msg=${encodeURIComponent(msg)}&volume=${volume}&rate=${rate}&pitch=${pitch}`);
+    const data = await res.json();
+
+    if (data.status === "ok") {
+        showStatus("🔊 Falando...");
+    } else {
+        showStatus("Erro: " + data.msg);
+    }
+}
+
+async function vibrar() {
+    await fetch("/vibrate");
+    showStatus("📳 Vibrou!");
+}
+
+function showStatus(msg) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+
+    setTimeout(() => {
+        el.textContent = "";
+    }, 2000);
+}
+</script>
+
+</body>
+</html>

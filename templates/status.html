@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Status do Dispositivo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    font-family: Arial;
+    background: linear-gradient(135deg, #1e1e2f, #2c2c54);
+    color: white;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    width: 350px;
+}
+
+.card {
+    background: rgba(47,47,79,0.85);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.battery {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.good { color: #4CAF50; }
+.medium { color: #FFC107; }
+.low { color: #F44336; }
+
+.small {
+    font-size: 12px;
+    opacity: 0.7;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>📊 Status</h1>
+
+    <div class="card">
+        <h2>🔋 Bateria</h2>
+        <div id="battery" class="battery">...</div>
+        <div id="bat_extra" class="small"></div>
+    </div>
+
+    <div class="card">
+        <h2>📡 Rede</h2>
+        <div id="wifi">...</div>
+    </div>
+
+    <div class="card">
+        <h2>📱 Dispositivo</h2>
+        <div id="device">...</div>
+    </div>
+
+    <div class="card">
+    <h2>🌐 Túnel</h2>
+
+    <input type="number" id="porta" value="5000" style="width:100%; margin-bottom:10px;">
+
+    <button onclick="startTunel()">🚀 Iniciar</button>
+    <button onclick="stopTunel()">🔪 Parar</button>
+
+    <div id="tunelStatus" class="small">
+    </div>
+    <div id="tunelUrl" class="small"></div>
+    </div>
+</div>
+
+<script>
+async function loadStatus() {
+    const res = await fetch("/status_data");
+    const data = await res.json();
+
+    // 🔋 bateria
+    const level = data.battery.percentage || 0;
+    const charging = data.battery.plugged;
+
+    let cls = "good";
+    if (level < 30) cls = "low";
+    else if (level < 60) cls = "medium";
+
+    document.getElementById("battery").innerHTML =
+        `<span class="${cls}">${level}%</span> ${charging ? "⚡" : ""}`;
+
+    document.getElementById("bat_extra").textContent =
+        `Status: ${data.battery.status}`;
+
+    // 📡 wifi
+    if (data.wifi.ssid) {
+        document.getElementById("wifi").innerHTML =
+            `SSID: ${data.wifi.ssid}<br>IP: ${data.wifi.ip}`;
+    } else {
+        document.getElementById("wifi").textContent = "Sem conexão Wi-Fi";
+    }
+
+    // 📱 device
+    document.getElementById("device").innerHTML =
+        `Modelo: ${data.device.model}<br>
+         Android: ${data.device.version}`;
+}
+
+// auto refresh
+setInterval(loadStatus, 3000);
+loadStatus();
+</script>
+<script>
+async function startTunel() {
+    const porta = document.getElementById("porta").value;
+
+    await fetch(`/tunel/start?porta=${porta}`);
+    document.getElementById("tunelStatus").textContent = "Iniciando...";
+}
+
+async function stopTunel() {
+    const porta = document.getElementById("porta").value;
+
+    await fetch(`/tunel/stop?porta=${porta}`);
+    document.getElementById("tunelStatus").textContent = `Parado (${porta})`;
+}
+
+async function checkTunel() {
+    const res = await fetch("/tunel/status");
+    const data = await res.json();
+
+    document.getElementById("tunelStatus").textContent =
+        data.running ? "🟢 Ativo" : "🔴 Parado";
+}
+
+setInterval(checkTunel, 3000);
+</script>
+<script>
+async function getTunelUrl() {
+    const porta = document.getElementById("porta").value;
+
+    const res = await fetch(`/tunel/url?porta=${porta}`);
+    const data = await res.json();
+
+    const el = document.getElementById("tunelUrl");
+
+    if (data.url) {
+        el.innerHTML = `🌐 <a href="${data.url}" target="_blank">${data.url}</a>`;
+    } else {
+        el.textContent = "Sem URL ainda...";
+    }
+}
+
+setInterval(getTunelUrl, 3000);
+</script>
+</body>
+</html>
