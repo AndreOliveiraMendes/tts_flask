@@ -153,6 +153,14 @@ def stop_tunel():
 
     return jsonify({"status": "stopped", "porta": porta})
 
+@app.route('/tunel/status')
+def tunel_status():
+    try:
+        out = subprocess.check_output(["pgrep", "-f", "cloudflared"])
+        return jsonify({"running": True})
+    except:
+        return jsonify({"running": False})
+
 @app.route('/tunel/url')
 def tunel_url():
     porta = request.args.get("porta", "5000")
